@@ -1,0 +1,152 @@
+---
+title: "A short introduction to the iGATE framework with R"
+author: "Stefan Stein"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+bibliography: igate.bib
+vignette: >
+  %\VignetteIndexEntry{A short introduction to the iGATE framework with R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Methodology
+
+The igate package implements the **i**nitial **G**uided **A**nalytics for parameter **T**esting and controland **E**xtraction (iGATE) framework for manufacturing data. The goal of iGATE is to enable *guided analytics* in industry, that is, to provide a statistically sound framework for process optimization that is easy enough to be used and understood by employees without statistical training. The goal is to have simplicity and interpretability while maintaining statistical rigor.
+
+Having identified a manufacturing ‘problem’ to be investigated, a data set is assembled for a ‘typical’ period of
+operation, i.e. excluding known disturbances such as maintenance or equipment failures. This
+data set includes the so called *target variable*, a direct indication or proxy for the problem under
+consideration and the variable whose variation we want to explain, and a number of parameters representing *suspected sources of variation*
+(SSVs), i.e. variables that we consider potentially influential for the value of the `target`. Parameters with known and explainable relationships with the target variable should be
+excluded from the analysis, although this can be addressed in an iterative manner though
+subsequent exclusion and repeating of the process. Care has been taken to robustify the approach against outliers and missing data, in order to make it a reliable tool that can be used with possibly messy or incomplete real-world data sets. The iGATE procedure consists of the following steps (detailed explanations follow below):
+
+1. Select 8 Best of the Best (BOB) and 8 Worst of the Worst (WOW) products. The number of observations chosen can be changed using the `versus` argument of `igate`/ `categorical.igate`.
+1. Perform the Tukey-Duckworth test for each SSV (see details below).
+1. For each SSV selected by the said test, perform Wilcoxon Rank test.
+1. Extract upper/ lower control limit for kept parameters.
+1. Perform sanity check via regression plot; decide which parameters to keep.
+1. Validate choice of parameters and control limits.
+1. Report findings in standardized format.
+
+Steps 1-4 are performed using the `igate` function for continuous target variables or the `categorical.igate` function for categorical target variables. Especially for categorical targets with few categories `robust.categorical.igate` is a robustified version of `categorical.igate` and should be considered.
+
+When running `igate`/ `categorical.igate` with default settings, any outliers for the target variable are excluded and the observations corresponding to the best 8 (B) and worst 8 (W) instances of the target variable are identified. For each of
+these 16 observations, each SSV is inspected in turn. The distribution of the values of the SSV of the 8 BOB and 8 WOW are analyzed by applying the Tukey-Duckworth test [@tukeycompacttest59]. If the critical value returned by the test is larger than 6 (this corresponds to a p-value of less than 0.05), the SSV is retained as being potentially significant.
+This test was chosen for its simplicity and ease of interpretation and visualization. SSVs failing the test are highly unlikely to be influential whilst SSVs
+passing the test may be influential. The Wilcoxon-Rank test performed in step three of iGATE serves as a possibly more widely known alternative, that might, however, be harder to explain to non-statisticians. The main function of these steps is to facilitate dimensionality reduction in the data set to generate a manageable population for expert consideration.
+
+Step 5 is performed by calling `igate.regressions`, resp. `categorical.freqplot`. These functions produce a regression (for continuous target) resp. frequency (for categorical targets) plot and save it to the current working directory. The domain expert should review these plots and decide which parameters to keep for further analysis based on goodness of fit of the data to the plot.
+
+For the validation step, the production period from which the validation data is selected is dependent on the business situation, but should be from a period of operation consistent with that from which the initial
+population was drawn, i.e. similar product types, similar level of equipment status etc. The
+validation step then considers all the retained SSV as a collective in terms of good and bad
+bands, and extracts from the validation sample all the records which satisfy the condition that all
+retained SSVs lie within these bands. The expectation is that where all the SSVs lie within the
+good band, then the target should also correspond to the best performance, and vice versa
+where the retained SSVs all lie in the bad bands we expect to see bad performance. The application gives feedback on the extent to
+which this criterion is satisfied in order to help the user conclude the exploration and make
+recommendations for subsequent improvements. Validation is performed via the `validate` function.
+
+We consider the last step, the reporting of the results in a standardized manner, an integral part of iGATE that ensures that knowledge about past analyses is retained within a company. This is achieved by calling the `report` function.
+
+## Getting started
+
+Install `igate` just like any other R package directly from CRAN and load it afterwards by running
+```{r, eval=FALSE}
+install.packages("igate")
+library(igate)
+```
+
+We recommend changing the working directory to a new, empty directory, as various functions in the `igate` package will save plots to the current working directory. The working directory can be changed using the `setwd()` function or, when using R Studio, via clicking *Session -> Set Working Directory -> Choose Directory*. 
+
+## An example for continuous target
+
+We use the `iris` data as an example for performing igate on a continuous target.
+```{r, include=FALSE}
+library(igate)
+```
+
+
+```{r}
+set.seed(123)
+n <- nrow(iris)*2/3
+rows <- sample(1:nrow(iris), n)
+df <- iris[rows, ]
+results <- igate(df, target = "Sepal.Length", good_end = "high", savePlots = TRUE)
+results
+```
+
+The significant variables are shown alongside their count summary statistic from the Tukey-Duckworth Test as well as the p-value from the Wilcoxon-Rank test. Also, we see the good and bad control bands as well as several summary statistics to ascertain the randomness in the results (see documentation of `igate` for details). Remember to use the option `savePlots = TRUE` if you want to save the boxplot of the target variable as a png. This png will be needed for producing the final report of the analysis.
+
+Next, we perform a sanity check for the found results
+```{r}
+igate.regressions(df, target = "Sepal.Length", ssv = results$Causes, savePlots = TRUE)
+```
+
+A data frame is output, showing us that the regression succeeded (column `regression_plot`) for both SSV as well as displaying the respective $r^2$ value, gradient and intercept values etc. Regression plots of each SSV against the target will be plotted. Remember to set the option `savePlots = TRUE` in the call of `igate.regressions` to save the regression plots as png files. These will be needed if you want to produce a report with the `report` function. Upon visual inspection, the expert can decide if they want to keep the SSV for further analysis or not.
+
+```{r}
+validation_df <- iris[-rows,]
+val <- validate(iris, target = "Sepal.Length", causes = results$Causes, results_df = results)
+```
+
+If the type (continuous or categorical) of igate to be validated is not specified, `validate` will guess it automatically. The output `val` is a list of three data frames: The first contains all the observations in the validation data set falling into all the good resp. all the bad control bands plus an additional column `expected_quality`, indicating whether the observation falls into the good or the bad band.
+
+```{r}
+head(val[[1]])
+```
+
+
+The second data frame has one row for each validated SSV and a column `Good_count` reps. `Bad_count` giving the number of observations from the validation data frame that fall into the good resp. bad control band for this SSV. The first data frame is the intersection of all these these observations for all the SSV.
+
+```{r}
+val[[2]]
+```
+
+Lastly, the third data frame summarizes the first. If our target was continuous, it contains minimum and maximum target value of the observations in the first data frame with `expected_quality` good resp. bad.
+
+```{r}
+val[[3]]
+```
+
+As we can see, indeed those observations with predicted good quality have higher values than those with predicted bad quality, indicating that our analysis was successful and we found the significant process parameters.
+
+Finally, if we specified `savePlots = TRUE` in `igate` and `igate.regressions` and saved the corresponding plots to the current working directory, we can produce a standardized report summarizing our results by running
+
+```{r, eval=FALSE}
+validatedObs <- val[[1]]
+validationCounts <- val[[2]]
+validationSummary <- val[[3]]
+
+# choose a directory you want to save the plot into.
+output_dir <- "YOUR_DIRECTORY"
+
+report(df = df, 
+       target = "Sepal.Length",
+       type = "continuous", 
+       good_outcome = "high",
+       results_path = "results", 
+       validation = TRUE, 
+       validation_path = "validatedObs",
+       validation_counts = "validationCounts", 
+       validation_summary = "validationSummary",
+       output_name = "testing_igate",
+       output_directory = output_dir)
+```
+
+This will create a html file titled "igate_Report.html" in the current working directory.
+
+Using igate for categorical target variables is completely analogous, simply run `categorical.igate` and `categorical.freqplot` instead of `igate` and `igate.regressions`.
+
+## References
+
+
