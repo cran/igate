@@ -1,7 +1,7 @@
 Package: igate
 Type: Package
 Title: Guided Analytics for Testing Manufacturing Parameters
-Version: 0.3.2
+Version: 0.3.3
 Authors@R: person("Stefan", "Stein", email = "s.stein@warwick.ac.uk",
                   role = c("aut", "cre"))
 Description: An implementation of the initial guided analytics for parameter testing and
@@ -14,14 +14,15 @@ BugReports: https://github.com/stefan-stein/igate/issues
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-Depends: R (>= 2.10), ggplot2, dplyr, grDevices, stringr, graphics,
-        stats
-Suggests: knitr, readr, xtable, kableExtra, pander, rmarkdown
+SystemRequirements: pandoc (>= 1.12.3) - http://pandoc.org
+Depends: R (>= 3.6.0),
+Imports: ggplot2, dplyr, grDevices, stringr, graphics, stats, knitr,
+        xtable, kableExtra, rmarkdown
 RoxygenNote: 6.1.1
 VignetteBuilder: knitr
 NeedsCompilation: no
-Packaged: 2019-09-05 14:23:46 UTC; stefanstein
+Packaged: 2019-09-10 08:30:57 UTC; stefanstein
 Author: Stefan Stein [aut, cre]
 Maintainer: Stefan Stein <s.stein@warwick.ac.uk>
 Repository: CRAN
-Date/Publication: 2019-09-07 09:30:04 UTC
+Date/Publication: 2019-09-10 22:50:06 UTC
